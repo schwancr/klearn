@@ -3,9 +3,9 @@ import numpy as np
 import scipy.linalg
 from msmbuilder import io
 import pickle
-from klearn.kernels import AbstractKernel, ProjectingMixin, CrossValidatingMixin
+from klearn.learners import BaseLearner, ProjectingMixin, CrossValidatingMixin
 
-class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
+class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
     """ 
     class for calculating tICs in a high dimensional feature space
     """
@@ -42,41 +42,42 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
         self.dt = int(dt)
 
         self._normalized = False
-        self.acf_vals = None
+
+        self.vecs = None
+        self.vals = None
+
         self.vec_vars = None
 
 
-    def add_training_data(self, trajectory, trajectory_dt=None, prepped=True):
+    def add_training_data(self, X, X_dt=None):
         """
         append a trajectory to the calculation. Right now this just appends 
         the trajectory to the concatenated trajectories
 
         Parameters
         ----------
-        trajectory : np.ndarray (2D)
+        X : np.ndarray
             two dimensional np.ndarray with time in the first axis and 
             features in the second axis
-        trajectory_dt : np.ndarray (2D), optional
+        X_dt : np.ndarray (2D), optional
             for each point we need a corresponding point that is separated
-            in a trajectory by dt. If trajectory_dt is not None, then it should
-            be the same length as trajectory such that trajectory[i] comes 
-            exactly dt before trajectory_dt[i]. If trajectory_dt is None, then
-            we will get all possible pairs from trajectory (trajectory[:-dt, 
-            trajectory[dt:]).
-        prepped : 
-        
+            in a trajectory by dt. If X_dt is not None, then it should
+            be the same length as trajectory such that X[i] comes 
+            exactly dt before X_dt[i]. If X_dt is None, then
+            we will get all possible pairs from X (X[:-dt, 
+            X[dt:]).
         """
 
-        if trajectory_dt is None:
-            A = trajectory[:-self.dt]
-            B = trajectory[self.dt:]
+        if X_dt is None:
+            A = X[:-self.dt]
+            B = X[self.dt:]
 
         else:
-            if trajectory_dt.shape != trajectory.shape:
-                raise Exception("trajectory and trajectory_dt should be same shape!")
+            if X_dt.shape != X.shape:
+                raise Exception("X and X_dt should be same shape!")
 
-            A = trajectory
-            B = trajectory_dt
+            A = X
+            B = X_dt
 
         if self._Xa is None:
             self._Xa = A
@@ -144,44 +145,44 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
         lhs = K.dot(rot_mat).dot(K)
         rhs = K.dot(K) + np.eye(K.shape[0]) * self.reg_factor
 
-        self.eigen_sol = scipy.linalg.eig(lhs, b=rhs)
+        eigen_sol = scipy.linalg.eig(lhs, b=rhs)
+
+        self.vals = eigen_sol[0]
+        self.vecs = eigen_sol[1]
+
+        if np.abs(self.vals).max() > 1:
+            logger.warn("some eigenvalues are not bounded by one. "
+                        "You might try changing the regularization factor.")
+
+
+        if np.abs(self.vals.imag).max() > 1E-12:
+            logger.warn("some eigenvalues are not real. You might"
+                        " try chaniging the regularization factor.")
+
+        else:
+            self.vals = self.vals.real
+            self.vecs = self.vecs.real
 
         self._normalize()
-
         self._sort()
 
-        return self.eigen_sol
+        return self.vals, self.vecs
     
 
     def _sort(self):
         """
         sort eigenvectors / eigenvalues so they are decreasing
         """
-        if self.eigen_sol is None:
+        if self.vals is None:
             logger.warn("have not calculated eigenvectors yet...")
             return
 
         if not self._normalized:
             self._normalize()
 
-        vecs = self.eigen_sol[1]
-        term2 = self.reg_factor * np.square(vecs).sum(axis=0) / vecs.shape[0]
-
-        self.acf_vals = self.eigen_sol[0].real * (1 + term2.real)
-
-        dec_ind = np.argsort(self.acf_vals)[::-1]
-        # sort them in descending order
-
-        good_acf_bools = np.abs(self.acf_vals[dec_ind] <= 1)
-        good_acf_inds = dec_ind[np.where(good_acf_bools)]
-        bad_acf_inds = dec_ind[np.where(1 - good_acf_bools)][::-1]
-
-        # don't throw anything out, but put the "bad" ones at the end sorted
-        # by least "badness"
-        end_sorted = np.concatenate([good_acf_inds, bad_acf_inds])
-
-        self.acf_vals = self.acf_vals[end_sorted]
-        self.eigen_sol = (self.eigen_sol[0][end_sorted], self.eigen_sol[1][:, end_sorted])
+        dec_ind = np.argsort(self.vals.real)[::-1]
+        self.vals = self.vals[dec_ind]
+        self.vecs = self.vecs[:, dec_ind]
 
 
     def _normalize(self):
@@ -197,39 +198,37 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
 
         M = float(self.K.shape[0])
 
-        vKK = self.eigen_sol[1].T.dot(KK)
+        vKK = self.vecs.T.dot(KK)
 
-        self.vec_vars = np.sum(vKK * self.eigen_sol[1].T, axis=1) / M
+        self.vec_vars = np.sum(vKK * self.vecs.T, axis=1) / M
         # dividing by M instead of M - 1. Shouldn't really matter...
 
-        norm_vecs = self.eigen_sol[1] / np.sqrt(self.vec_vars)
+        norm_vecs = self.vecs / np.sqrt(self.vec_vars)
 
-        self.eigen_sol = (self.eigen_sol[0], norm_vecs)
-
-        self._normalized = True
+        self.vecs = norm_vecs
 
 
-    def project(self, trajectory, which):
+    def project(self, X, which):
         """
         project a point onto an eigenvector
 
         Parameters
         ----------
-        trajectory : np.ndarray
-            trajectory to project onto eigenvector
-        which : list or int
+        X : np.ndarray
+            data to project onto eigenvector
+        which : array_like or int
             which eigenvector(s) (0-indexed) to project onto
         
         Returns
         -------
-        proj_trajectory : np.ndarray
+        proj_X : np.ndarray
             projected value of each point in the trajectory
         """
 
         comp_to_all = []
 
         for i in xrange(len(self._Xall)):
-            comp_to_all.append(self.kernel.one_to_all(self._Xall, trajectory, i))
+            comp_to_all.append(self.kernel.one_to_all(self._Xall, X, i))
         
         comp_to_all = np.array(comp_to_all).T
         # rows are points from trajectory
@@ -241,7 +240,6 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
                         - self.K_uncentered.sum(axis=0) / float(M) \
                         + self.K_uncentered.sum() / float(M) / float(M)
 
-
         if isinstance(which, int):
             which = [which]
 
@@ -250,22 +248,67 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
         if not self._normalized:
             self._normalize()
 
-        vecs = self.eigen_sol[1][:, which]
+        vecs = self.vecs[:, which]
 
-        proj_trajectory = comp_to_all.dot(vecs)
+        proj_X = comp_to_all.dot(vecs)
 
-        return proj_trajectory
+        return proj_X
 
 
-    def evaluate(self, equilA, equilB, trajA=None, trajB=None, projA=None,
-        projB=None, num_vecs=10, timestep=1):
+    def evaluate(self, equil, equil_dt, X=None, X_dt=None, proj_X=None,
+        proj_X_dt=None, num_vecs=10, timestep=1):
+        """
+        Evaluate the solutions based on new data X. This uses the assumption that
+        the ktICA solutions are the eigenfunctions of the Transfer operator.
+        This means we can decompose the transfer operator into a sum of terms
+        along each ktICA solution, which gives a probability of a new trajectory.
 
-        if not trajA is None and not trajB is None:
-            if np.unique([len(ary) for ary in [trajA, trajB, equilA, equilB]]).shape[0] != 1:
-                raise Exception("trajA, trajB, equilA, and equilB should all be the same length.")
-        else:
-            if np.unique([len(ary) for ary in [projA, projB, equilA, equilB]]).shape[0] != 1:
-                raise Exception("trajA, trajB, equilA, and equilB should all be the same length.")
+        Using Bayes' rule this can be translated into the likelihood of the
+        ktICA solution.
+
+        Parameters
+        ----------
+        equil : np.ndarray
+            equilibrium probability of each conformation in the data, X
+        equil_dt : np.ndarray
+            equilibrium probability of each conformation in the data, X_dt
+        X : np.ndarray
+            data with features in the second axis
+        X_dt : np.ndarray
+            data such that X_dt[i] is observed one timestep after X[i]. Note
+            that this timestep need not be the same as the dt specified for
+            solving the ktICA solution
+        proj_X : np.ndarray
+            same as X, but already projected using self.project(X, ...)
+        proj_X_dt : np.ndarray
+            same as X_dt, but already projected using self.project(X_dt, ...)
+        num_vecs : int, optional
+            number of vectors to evaluate the likelihood at
+        timestep : time separating X from X_dt (should be in the same units
+            as self.dt
+
+        Returns
+        -------
+        log_like : float
+            log likelihood of the new data given the ktICA solutions
+        """
+
+        if len(equilA.shape) == 1:
+            equilA = np.reshape(equilA, (-1, 1))
+        
+
+        if len(equilB.shape) == 1:
+            equilB = np.reshape(equilB, (-1, 1))
+        
+
+        if proj_X is None or proj_X_dt is None:
+            proj_X = self.project(X, which=np.arange(num_vecs))
+            proj_X_dt = self.project(X_dt, which=np.arange(num_vecs))
+
+
+        if np.unique([len(ary) for ary in [proj_X, proj_X_dt, equil_X, equil_X_dt]]).shape[0] != 1:
+            raise Exception("X, X_dt, equil, and equil_dt should all be the same length.")
+
 
         if timestep < self.dt:
             raise Exception("can't model dynamics less than original dt.")
@@ -277,24 +320,18 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
             if (timestep % self.dt):
                 raise Exception("for timestep > dt, timestep must be a multiple of dt.")
 
-            exponent = timestep / self.dt
+            exponent = int(round(timestep / self.dt))
 
-        if projA is None:
-            projA = self.project(trajA, which=np.arange(num_vecs))
-    
-        if projB is None:
-            projB = self.project(trajB, which=np.arange(num_vecs))
+        N = proj_X.shape[0]
 
-        N = projA.shape[0]
-        projA = np.hstack([np.ones((N, 1)), projA])
-        projB = np.hstack([np.ones((N, 1)), projB])
-        vals = np.concatenate([[1], self.acf_vals[:num_vecs]]).real
+        # the first right eigenvector sends everything to unity
+        proj_X = np.hstack([np.ones((N, 1)), projA])
+        proj_X_dt = np.hstack([np.ones((N, 1)), projB])
+
+        vals = np.concatenate([[1], self.vals[:num_vecs]]).real
         vals = np.power(vals, exponent)
         vals = np.reshape(vals, (-1, 1))
-        if len(equilA.shape) == 1:
-            equilA = np.reshape(equilA, (-1, 1))
-        if len(equilB.shape) == 1:
-            equilB = np.reshape(equilB, (-1, 1))
+
         temp_array = projA * projB * equilB
         # don't multiply by muA because that is the normalization
         # constraint on the output PDF
@@ -303,7 +340,7 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
         # we would really need to multiply by a volume of phase space, since this
         # is the likelihood PDF...
         log_like = np.log(temp_array).sum()
-        print log_like
+
         return log_like
 
 
@@ -362,7 +399,8 @@ class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
         kt._Xb = kt._Xall[len(kt._Xall) / 2:]
 
 
-        kt.eigen_sol = (f['ktica_vals'], f['ktica_vecs'])
+        kt.vals = f['ktica_vals']
+        kt.vecs = f['ktica_vecs'])
 
         kt._normalized = False
         kt._sort()

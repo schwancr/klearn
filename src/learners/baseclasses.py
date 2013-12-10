@@ -38,6 +38,26 @@ class BaseLearner(object):
         
         raise NotImplementedError("not implemented!")
 
+    
+    @abc.abstractmethod
+    def save(self, filename):
+        """
+        save the results of the learning algorithm to a file
+        """
+        
+        raise NotImplementedError("not implemented!")
+
+
+    @abc.abstractmethod
+    @classmethod
+    def load(cls, filename):
+        """
+        load the results from a file saved using the cls.save 
+        method
+        """
+        
+        raise NotImplementedError("not implemented!")
+
 
 class CrossValidatingMixin(object):
     """
