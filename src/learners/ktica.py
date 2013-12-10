@@ -3,9 +3,9 @@ import numpy as np
 import scipy.linalg
 from msmbuilder import io
 import pickle
-from ktica.kernels import AbstractKernel
+from klearn.kernels import AbstractKernel, ProjectingMixin, CrossValidatingMixin
 
-class ktICA(object):
+class ktICA(AbstractKernel, ProjectingMixin, CrossValidatingMixin):
     """ 
     class for calculating tICs in a high dimensional feature space
     """
@@ -29,9 +29,7 @@ class ktICA(object):
             when solving the generalized eigenvalue problem
         """
 
-        if not isinstance(kernel, AbstractKernel):
-            raise Exception("kernel must be an instance of subclass of AbstractKernel")
-        self.kernel = kernel
+        super(self, ktICA).__init__(kernel)
 
         self._Xa = None
         self._Xb = None
@@ -48,7 +46,7 @@ class ktICA(object):
         self.vec_vars = None
 
 
-    def add_traj(self, trajectory, trajectory_dt=None, prepped=True):
+    def add_training_data(self, trajectory, trajectory_dt=None, prepped=True):
         """
         append a trajectory to the calculation. Right now this just appends 
         the trajectory to the concatenated trajectories
@@ -259,7 +257,7 @@ class ktICA(object):
         return proj_trajectory
 
 
-    def log_likelihood_pairs(self, equilA, equilB, trajA=None, trajB=None, projA=None,
+    def evaluate(self, equilA, equilB, trajA=None, trajB=None, projA=None,
         projB=None, num_vecs=10, timestep=1):
 
         if not trajA is None and not trajB is None:
@@ -308,51 +306,6 @@ class ktICA(object):
         print log_like
         return log_like
 
-
-    def log_likelihood(self, equil_pdf, trajectory=None, proj_trajectory=None, 
-        num_vecs=10, timestep=1):
-
-        if timestep < self.dt:
-            if (self.dt % timestep):
-                raise Exception("for timestep < dt, dt must be a multiple of timestep")
-
-            exponent = 1
-            stride = self.dt / timestep 
-
-        elif timestep == self.dt:
-            exponent = 1
-            stride = 1
-
-        else:
-            if (timestep % self.dt):
-                raise Exception("for timestep > dt, timestep must be a multiple of dt.")
-
-            exponent = timestep / self.dt
-            stride = 1
-
-        if proj_trajectory is None:
-            proj_trajectory = self.project(trajectory[::stride], which=np.arange(num_vecs))
-
-        if len(equil_pdf) != len(proj_trajectory):
-            equil_pdf = equil_pdf[::stride]
-            # assume that the user just didn't stride the equil pdf
-
-        proj_stationary_traj = np.hstack([np.ones((proj_trajectory.shape[0], 1)), 
-                                    proj_trajectory])
-
-        vals = np.concatenate([[1], self.eigen_sol[0][:num_vecs]]).real
-        vals = np.power(vals, exponent)
-        vals = np.reshape(vals, (-1, 1))
-
-        equil_pdf = np.reshape(equil_pdf, (-1, 1))
-        likes = proj_stationary_traj[:-1] * proj_stationary_traj[1:] * equil_pdf[:-1] * equil_pdf[1:]
-        # NOTE: The above likelihood is merely proportional to the actual likelihood
-        # we would really need to multiply by a volume of phase space, since this
-        # is the likelihood PDF...
-        log_like = np.log(likes.dot(vals)).sum(axis=0)
-
-        return log_like
-        
 
     def save(self, output_fn):
         """
