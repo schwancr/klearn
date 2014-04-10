@@ -48,7 +48,6 @@ class BaseLearner(object):
         raise NotImplementedError("not implemented!")
 
 
-    @abc.abstractmethod
     @classmethod
     def load(cls, filename):
         """

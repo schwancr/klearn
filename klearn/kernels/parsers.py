@@ -1,6 +1,6 @@
 
 from msmbuilder.metrics.parsers import add_argument, add_basic_metric_parsers, construct_basic_metric
-from ktica.kernels import DotProduct, Gaussian, Polynomial
+from klearn.kernels import DotProduct, Gaussian, Polynomial
 
 def add_kernel_parsers(parser):
     

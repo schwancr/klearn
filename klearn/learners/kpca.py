@@ -1,7 +1,7 @@
 
 import numpy as np
 import scipy.linalg
-from msmbuilder import io
+from mdtraj import io
 from klearn.learners import BaseLearner, ProjectingMixin
 
 class kPCA(BaseLearner, ProjectingMixin):

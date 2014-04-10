@@ -1,5 +1,5 @@
 
-from ktica.kernels import AbstractKernel
+from .baseclasses import AbstractKernel
 from msmbuilder.metrics.baseclasses import Vectorized
 import numpy as np
 

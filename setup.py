@@ -134,7 +134,7 @@ if os.environ.get('READTHEDOCS', None) == 'True' and __name__ == '__main__':
     mockdir = tempfile.mkdtemp()
     open(os.path.join(mockdir, '__init__.py'), 'w').close()
     metadata['package_dir'] = {'ktica': 'ktica',
-                               'ktica.objects' : 'ktica/objects',
+                               'ktica.learners' : 'ktica/learners',
                                'ktica.kernels' : 'ktica/kernels',
                                'ktica.metrics' : 'ktica/metrics'}
 
@@ -176,6 +176,8 @@ def configuration(parent_package='',top_path=None):
                           subpackage_path='klearn/kernels')
     config.add_subpackage('msmbmetrics',
                           subpackage_path='klearn/msmbmetrics')
+    config.add_subpackage('learners',
+                          subpackage_path='klearn/learners')
 
     return config
 

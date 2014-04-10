@@ -34,3 +34,7 @@
 *.pyc
 
 *.h5
+
+build
+dist
+*.egg-info

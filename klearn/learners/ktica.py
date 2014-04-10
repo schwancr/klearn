@@ -1,7 +1,7 @@
 
 import numpy as np
 import scipy.linalg
-from msmbuilder import io
+from mdtraj import io
 import pickle
 from klearn.learners import BaseLearner, ProjectingMixin, CrossValidatingMixin
 
@@ -29,7 +29,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             when solving the generalized eigenvalue problem
         """
 
-        super(self, ktICA).__init__(kernel)
+        super(ktICA, self).__init__(kernel)
 
         self._Xa = None
         self._Xb = None
@@ -49,7 +49,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         self.vec_vars = None
 
 
-    def add_training_data(self, X, X_dt=None):
+    def add_training_data(self, X, X_dt=None, D=None):
         """
         append a trajectory to the calculation. Right now this just appends 
         the trajectory to the concatenated trajectories
@@ -66,6 +66,11 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             exactly dt before X_dt[i]. If X_dt is None, then
             we will get all possible pairs from X (X[:-dt, 
             X[dt:]).
+        D : np.ndarray
+            distances from every point to every other point:
+
+                [ d(X(i), X(j))    ... d(X(i), X_dt(j))    ]
+                [ d(X_dt(i), X(j)) ... d(X_dt(i), X_dt(j)) ]
         """
 
         if X_dt is None:
@@ -87,7 +92,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             self._Xb = np.concatenate((self._Xb, B))  
 
 
-    def calculate_matrices(self):
+    def calculate_matrices(self, D=None):
         """
         calculate the two matrices we need, K and Khat and then normalize them
         """
@@ -293,12 +298,12 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             log likelihood of the new data given the ktICA solutions
         """
 
-        if len(equilA.shape) == 1:
-            equilA = np.reshape(equilA, (-1, 1))
+        if len(equil.shape) == 1:
+            equil = np.reshape(equil, (-1, 1))
         
 
-        if len(equilB.shape) == 1:
-            equilB = np.reshape(equilB, (-1, 1))
+        if len(equil_dt.shape) == 1:
+            equil_dt = np.reshape(equil_dt, (-1, 1))
         
 
         if proj_X is None or proj_X_dt is None:
@@ -306,7 +311,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             proj_X_dt = self.project(X_dt, which=np.arange(num_vecs))
 
 
-        if np.unique([len(ary) for ary in [proj_X, proj_X_dt, equil_X, equil_X_dt]]).shape[0] != 1:
+        if np.unique([len(ary) for ary in [proj_X, proj_X_dt, equil, equil_dt]]).shape[0] != 1:
             raise Exception("X, X_dt, equil, and equil_dt should all be the same length.")
 
 
@@ -325,20 +330,21 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         N = proj_X.shape[0]
 
         # the first right eigenvector sends everything to unity
-        proj_X = np.hstack([np.ones((N, 1)), projA])
-        proj_X_dt = np.hstack([np.ones((N, 1)), projB])
+        proj_X = np.hstack([np.ones((N, 1)), proj_X])
+        proj_X_dt = np.hstack([np.ones((N, 1)), proj_X_dt])
 
         vals = np.concatenate([[1], self.vals[:num_vecs]]).real
         vals = np.power(vals, exponent)
         vals = np.reshape(vals, (-1, 1))
 
-        temp_array = projA * projB * equilB
+        temp_array = proj_X * proj_X_dt * equil_dt
         # don't multiply by muA because that is the normalization
         # constraint on the output PDF
         temp_array = temp_array.dot(vals)
         # NOTE: The above likelihood is merely proportional to the actual likelihood
         # we would really need to multiply by a volume of phase space, since this
         # is the likelihood PDF...
+        temp_array[np.where(temp_array <=0)] = temp_array[np.where(temp_array > 0)].min() / 100.
         log_like = np.log(temp_array).sum()
 
         return log_like
@@ -400,7 +406,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
 
 
         kt.vals = f['ktica_vals']
-        kt.vecs = f['ktica_vecs'])
+        kt.vecs = f['ktica_vecs']
 
         kt._normalized = False
         kt._sort()
