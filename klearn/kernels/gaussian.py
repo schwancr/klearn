@@ -8,7 +8,7 @@ class Gaussian(AbstractKernel):
     gaussian kernel with some standard deviation
     """
 
-    def __init__(self, metric, std_dev=1):
+    def __init__(self, metric, std_dev=1.0):
 
         self.metric = metric
         self.std_dev = std_dev
@@ -18,8 +18,11 @@ class Gaussian(AbstractKernel):
         return "Gaussian kernel with norm defined by %s" % str(self.metric)
 
     def prepare_trajectory(self, trajectory):
-        return self.metric.prepare_trajectory(trajectory)
+        return np.double(self.metric.prepare_trajectory(trajectory))
 
     def one_to_all(self, prepared_traj1, prepared_traj2, index1):
-        return np.exp(np.square(self.metric.one_to_all(np.double(prepared_traj1), np.double(prepared_traj2), index1)) / self.denom)
+
+        distances = self.metric.one_to_all(prepared_traj1, prepared_traj2, index1)
+
+        return np.exp(np.square(distances) / self.denom)
 

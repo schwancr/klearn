@@ -4,6 +4,9 @@ import scipy.linalg
 from mdtraj import io
 import pickle
 from klearn.learners import BaseLearner, ProjectingMixin, CrossValidatingMixin
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
     """ 
@@ -49,7 +52,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         self.vec_vars = None
 
 
-    def add_training_data(self, X, X_dt=None, D=None):
+    def add_training_data(self, X, X_dt=None):
         """
         append a trajectory to the calculation. Right now this just appends 
         the trajectory to the concatenated trajectories
@@ -66,11 +69,6 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             exactly dt before X_dt[i]. If X_dt is None, then
             we will get all possible pairs from X (X[:-dt, 
             X[dt:]).
-        D : np.ndarray
-            distances from every point to every other point:
-
-                [ d(X(i), X(j))    ... d(X(i), X_dt(j))    ]
-                [ d(X_dt(i), X(j)) ... d(X_dt(i), X_dt(j)) ]
         """
 
         if X_dt is None:
@@ -92,19 +90,24 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             self._Xb = np.concatenate((self._Xb, B))  
 
 
-    def calculate_matrices(self, D=None):
+    def calculate_matrices(self, precomputed_K=None):
         """
         calculate the two matrices we need, K and Khat and then normalize them
         """
 
         N = len(self._Xa) * 2
 
-        K = np.zeros((N, N))
-
         self._Xall = np.concatenate((self._Xa, self._Xb))
 
-        for i in xrange(N):
-            K[i] = self.kernel.one_to_all(self._Xall, self._Xall, i)
+        if precomputed_K is None:
+            K = np.zeros((N, N))
+            for i in xrange(N):
+                K[i] = self.kernel.one_to_all(self._Xall, self._Xall, i)
+
+        else:
+            K = precomputed_K
+            if K.shape[0] != N:
+                raise Exception("precomputed K is the wrong size for this data.")
 
         # now normalize the matrices.
         self.K = np.zeros((N, N))
@@ -147,8 +150,8 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         rot_mat[:N, N:] = np.eye(N)
         rot_mat += rot_mat.T
 
-        lhs = K.dot(rot_mat).dot(K)
-        rhs = K.dot(K) + np.eye(K.shape[0]) * self.reg_factor
+        lhs = self.K.dot(rot_mat).dot(self.K)
+        rhs = self.K.dot(self.K) + np.eye(self.K.shape[0]) * self.reg_factor
 
         eigen_sol = scipy.linalg.eig(lhs, b=rhs)
 
@@ -260,7 +263,99 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         return proj_X
 
 
-    def evaluate(self, equil, equil_dt, X=None, X_dt=None, proj_X=None,
+    def evaluate(self, *args, **kwargs):
+        return self.evaluate_eigenvalues(*args, **kwargs)
+
+    
+    def evaluate_eigenvalues(self, X=None, X_dt=None, proj_X=None, proj_X_dt=None,
+        num_vecs=10, scheme='l2', timestep=1):
+        """
+        Evaluate the solutions based on new data. For each ktIC, this function 
+        computes the autocorrelation value. Then these eigenvalues can be
+        combined via a number of schemes to return a "score"
+
+        Parameters
+        ----------
+        X : np.ndarray
+            data with features in the second axis
+        X_dt : np.ndarray
+            data such that X_dt[i] is observed one timestep after X[i]. Note
+            that this timestep need not be the same as the dt specified for
+            solving the ktICA solution
+        proj_X : np.ndarray
+            same as X, but already projected using self.project(X, ...)
+        proj_X_dt : np.ndarray
+            same as X_dt, but already projected using self.project(X_dt, ...)
+        num_vecs : int, optional
+            number of vectors to evaluate the likelihood at
+        scheme : one of {'l2', 'l1', 'sum'}, optional
+            the scheme for evaluating the quality of a model:
+            - 'l2' : l2 norm on the deviation from the training set eigenvalues
+            - 'l1' : l1 norm on the deviation from the training set eigenvalues
+            - 'sum' : sum of the test set eigenvalues (this scheme essentially
+                doesn't care if the test eigenvalues are too slow, but does care
+                if they are too fast.)
+
+        Returns
+        -------
+        score : float
+            the score of this projection
+        """
+        
+        if proj_X is None or proj_X_dt is None:
+            proj_X = self.project(X, which=np.arange(num_vecs))
+            proj_X_dt = self.project(X_dt, which=np.arange(num_vecs))
+
+        if proj_X.shape != proj_X_dt.shape:
+            raise Exception("pairs of trajectory data should have the same shape")
+
+        if timestep < self.dt:
+            raise Exception("can't model dynamics less than original dt.")
+
+        elif timestep == self.dt:
+            exponent = 1
+
+        else:
+            if (timestep % self.dt):
+                raise Exception("for timestep > dt, timestep must be a multiple of dt.")
+
+            exponent = int(round(timestep / self.dt))
+
+        scheme = scheme.lower()
+        if not scheme in ['l1', 'l2', 'sum']:
+            raise Exception("scheme (%s) must be one of 'l1', 'l2', or 'sum'" % scheme)
+    
+        proj_X = proj_X - proj_X.mean(0)
+        proj_X_dt = proj_X_dt - proj_X_dt.mean(0)
+
+        numerator = np.sum(proj_X * proj_X_dt, axis=0)
+
+        denominator = np.sum(proj_X * proj_X, axis=0) + np.sum(proj_X_dt * proj_X_dt, axis=0)
+        denominator /= 2.0
+
+        ratio = numerator / denominator
+
+        vals = np.power(self.vals[:num_vecs], exponent)
+
+        l1 = np.abs(ratio - vals).sum()
+        l2 = np.square(ratio - vals).sum()
+        s = np.sum(ratio)
+
+        print "l1: %.2e - l2: %.2e - sum: %.2e" % (l1, l2, s)
+
+        if scheme == 'l1':
+            score = np.abs(ratio - vals).sum()
+
+        elif scheme == 'l2':
+            score = np.square(ratio - vals).sum()
+
+        elif scheme == 'sum':
+            score = np.sum(ratio)
+
+        return score
+
+
+    def log_likelihood(self, equil, equil_dt, X=None, X_dt=None, proj_X=None,
         proj_X_dt=None, num_vecs=10, timestep=1):
         """
         Evaluate the solutions based on new data X. This uses the assumption that
@@ -344,7 +439,10 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         # NOTE: The above likelihood is merely proportional to the actual likelihood
         # we would really need to multiply by a volume of phase space, since this
         # is the likelihood PDF...
-        temp_array[np.where(temp_array <=0)] = temp_array[np.where(temp_array > 0)].min() / 100.
+        #temp_array[np.where(temp_array <=0)] = temp_array[np.where(temp_array > 0)].min() / 1E6
+        bad_ind = np.where(temp_array <= 0)[0]
+        if len(bad_ind) > 0:
+            logger.warn("%d (out of %d) pairs were assigned nonpositive probabilities" % (len(bad_ind), len(temp_array)))
         log_like = np.log(temp_array).sum()
 
         return log_like
@@ -357,8 +455,8 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
     
         kernel_str = pickle.dumps(self.kernel)
 
-        io.saveh(output_fn, ktica_vals=self.eigen_sol[0],
-            ktica_vecs=self.eigen_sol[1], K=self.K, 
+        io.saveh(output_fn, vals=self.vals,
+            vecs=self.vecs, K=self.K, 
             K_uncentered=self.K_uncentered, 
             reg_factor=np.array([self.reg_factor]),
             traj=self._Xall, dt=np.array([self.dt]),
@@ -405,8 +503,8 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         kt._Xb = kt._Xall[len(kt._Xall) / 2:]
 
 
-        kt.vals = f['ktica_vals']
-        kt.vecs = f['ktica_vecs']
+        kt.vals = f['vals']
+        kt.vecs = f['vecs']
 
         kt._normalized = False
         kt._sort()

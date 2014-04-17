@@ -1,5 +1,5 @@
 
-from ktica import ktICA
+from klearn import ktICA
 from msmbuilder.metrics import Vectorized
 import numpy as np
 
@@ -10,8 +10,7 @@ class ktICADistance(Vectorized):
 
         super(ktICADistance, self).__init__(metric=metric, p=p)
 
-        self.ktica_obj = ktICA.load(ktica_fn, kernel.one_to_all)
-
+        self.ktica_obj = ktICA.load(ktica_fn, kernel)
         self.kernel = kernel
 
         if not which_vecs is None:

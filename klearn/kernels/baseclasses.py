@@ -9,6 +9,10 @@ class AbstractKernel(object):
         return self.one_to_all(*args, **kwargs)
     
     @abc.abstractmethod
+    def kernel_function(self, distances):
+        return 
+
+    @abc.abstractmethod
     def prepare_trajectory(self, trajectory):
         return
 
@@ -24,7 +28,6 @@ class AbstractKernel(object):
         
         return np.vstack([self.one_to_all( prepared_traj1, prepared_traj2, i ) for i in xrange(len(prepared_traj1))])
             
-    @abc.abstractmethod
     def all_pairwise(self, prepared_traj):
         traj_length = len(prepared_traj)
         output = -1 * np.ones(traj_length * (traj_length - 1) / 2)

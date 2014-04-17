@@ -2,8 +2,8 @@
 # THIS FILE IS GENERATED FROM KLEARN SETUP.PY
 short_version = '0.1'
 version = '0.1'
-full_version = '0.1.dev-d23b9b6'
-git_revision = 'd23b9b6bec5ece08f286325df4188ea3bc28bae4'
+full_version = '0.1.dev-57c4abf'
+git_revision = '57c4abf7c3c1ab0fc90aba6270bba27bef936e6d'
 release = False
 
 if not release:
