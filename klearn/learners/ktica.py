@@ -356,7 +356,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
 
 
     def log_likelihood(self, equil, equil_dt, X=None, X_dt=None, proj_X=None,
-        proj_X_dt=None, num_vecs=10, timestep=1):
+        proj_X_dt=None, num_vecs=10, timestep=1, min_prob=0.0):
         """
         Evaluate the solutions based on new data X. This uses the assumption that
         the ktICA solutions are the eigenfunctions of the Transfer operator.
@@ -443,6 +443,10 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         bad_ind = np.where(temp_array <= 0)[0]
         if len(bad_ind) > 0:
             logger.warn("%d (out of %d) pairs were assigned nonpositive probabilities" % (len(bad_ind), len(temp_array)))
+
+        if min_prob > 0:
+            temp_array[bad_ind] = min_prob
+
         log_like = np.log(temp_array).sum()
 
         return log_like
