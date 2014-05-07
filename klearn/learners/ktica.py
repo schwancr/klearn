@@ -268,7 +268,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
 
     
     def evaluate_eigenvalues(self, X=None, X_dt=None, proj_X=None, proj_X_dt=None,
-        num_vecs=10, scheme='l2', timestep=1):
+        num_vecs=10, scheme='all', timestep=1):
         """
         Evaluate the solutions based on new data. For each ktIC, this function 
         computes the autocorrelation value. Then these eigenvalues can be
@@ -288,18 +288,19 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             same as X_dt, but already projected using self.project(X_dt, ...)
         num_vecs : int, optional
             number of vectors to evaluate the likelihood at
-        scheme : one of {'l2', 'l1', 'sum'}, optional
+        scheme : one of {'l2', 'l1', 'sum', 'all'}, optional
             the scheme for evaluating the quality of a model:
             - 'l2' : l2 norm on the deviation from the training set eigenvalues
             - 'l1' : l1 norm on the deviation from the training set eigenvalues
             - 'sum' : sum of the test set eigenvalues (this scheme essentially
                 doesn't care if the test eigenvalues are too slow, but does care
                 if they are too fast.)
+            - 'all' : return all of the above
 
         Returns
         -------
-        score : float
-            the score of this projection
+        score : float or np.ndarray
+            the score of this projection (or three scores if scheme=='all')
         """
         
         if proj_X is None or proj_X_dt is None:
@@ -322,8 +323,8 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             exponent = int(round(timestep / self.dt))
 
         scheme = scheme.lower()
-        if not scheme in ['l1', 'l2', 'sum']:
-            raise Exception("scheme (%s) must be one of 'l1', 'l2', or 'sum'" % scheme)
+        if not scheme in ['l1', 'l2', 'sum', 'all']:
+            raise Exception("scheme (%s) must be one of 'l1', 'l2', 'sum', or 'all'" % scheme)
     
         proj_X = proj_X - proj_X.mean(0)
         proj_X_dt = proj_X_dt - proj_X_dt.mean(0)
@@ -351,6 +352,9 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
 
         elif scheme == 'sum':
             score = np.sum(ratio)
+
+        elif scheme == 'all':
+            score = np.array([l1, l2, s])
 
         return score
 
