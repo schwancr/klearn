@@ -328,9 +328,11 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         proj_X = proj_X - proj_X.mean(0)
         proj_X_dt = proj_X_dt - proj_X_dt.mean(0)
 
-        numerator = np.sum(proj_X * proj_X_dt, axis=0)
+        numerator = np.sum(proj_X * proj_X_dt, axis=0) 
+        numerate -= np.sum(proj_X, axis=0) * np.sum(proj_X_dt, axis=0)
 
         denominator = np.sum(proj_X * proj_X, axis=0) + np.sum(proj_X_dt * proj_X_dt, axis=0)
+        denominator -= np.sum(proj_X, axis=0) ** 2 + np.sum(proj_X_dt, axis=0) ** 2
         denominator /= 2.0
 
         ratio = numerator / denominator
