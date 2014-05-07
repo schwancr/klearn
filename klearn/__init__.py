@@ -16,3 +16,4 @@ _setup_logging()
 
 from learners.ktica import ktICA
 from learners.kpca import kPCA
+from learners.kcca import kCCA
