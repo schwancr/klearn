@@ -325,7 +325,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             exponent = int(round(timestep / self.dt))
 
         scheme = scheme.lower()
-        if not scheme in ['l1', 'l2', 'sum', 'all']:
+        if not scheme in ['l1', 'l2', 'sum', 'rel', 'all']:
             raise Exception("scheme (%s) must be one of 'l1', 'l2', 'sum', or 'all'" % scheme)
     
         proj_X = proj_X# - proj_X.mean(0)
@@ -344,8 +344,9 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         l1 = np.abs(ratio - vals).sum()
         l2 = np.square(ratio - vals).sum()
         s = np.sum(ratio)
+        rel = np.abs((ratio - vals) / vals).sum()
 
-        print "l1: %.2e - l2: %.2e - sum: %.2e" % (l1, l2, s)
+        print "l1: %.2e - l2: %.2e - sum: %.2e - rel: %.2e" % (l1, l2, s, rel)
 
         if scheme == 'l1':
             score = np.abs(ratio - vals).sum()
@@ -356,8 +357,11 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         elif scheme == 'sum':
             score = np.sum(ratio)
 
+        elif scheme == 'rel':
+            score = rel
+
         elif scheme == 'all':
-            score = np.array([l1, l2, s])
+            score = np.array([l1, l2, s, rel])
 
         return score
 
