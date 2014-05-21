@@ -193,7 +193,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         self.vecs = self.vecs[:, dec_ind]
 
 
-    def _normalize(self):
+    def _normalize(self, use_regularization=False):
         """
         normalize the eigenvectors to unit variance.
 
@@ -210,6 +210,8 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
 
         self.vec_vars = np.sum(vKK * self.vecs.T, axis=1) / M
         # dividing by M instead of M - 1. Shouldn't really matter...
+        if use_regularization:
+            self.vec_vars += self.reg_factor * np.square(self.vecs).sum(0) / M
 
         norm_vecs = self.vecs / np.sqrt(self.vec_vars)
 
@@ -326,15 +328,14 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         if not scheme in ['l1', 'l2', 'sum', 'all']:
             raise Exception("scheme (%s) must be one of 'l1', 'l2', 'sum', or 'all'" % scheme)
     
-        proj_X = proj_X - proj_X.mean(0)
-        proj_X_dt = proj_X_dt - proj_X_dt.mean(0)
+        proj_X = proj_X# - proj_X.mean(0)
+        proj_X_dt = proj_X_dt# - proj_X_dt.mean(0)
 
-        numerator = np.sum(proj_X * proj_X_dt, axis=0) 
-        numerate -= np.sum(proj_X, axis=0) * np.sum(proj_X_dt, axis=0)
+        numerator = np.sum(proj_X * proj_X_dt, axis=0) / len(proj_X)
 
-        denominator = np.sum(proj_X * proj_X, axis=0) + np.sum(proj_X_dt * proj_X_dt, axis=0)
-        denominator -= np.sum(proj_X, axis=0) ** 2 + np.sum(proj_X_dt, axis=0) ** 2
-        denominator /= 2.0
+#        denominator = np.sum(proj_X * proj_X, axis=0) + np.sum(proj_X_dt * proj_X_dt, axis=0)
+#        denominator /= 2.0
+        denominator = 1.0
 
         ratio = numerator / denominator
 
