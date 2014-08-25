@@ -27,7 +27,7 @@ class kRidgeRegression(BaseKernelEstimator, TransformerMixin, RegressorMixin):
     """
     def __init__(self, kernel, eta=1.0, regularize_beta=False):
         
-        super(self, kRidgeRegression).__init__(kernel)
+        super(kRidgeRegression, self).__init__(kernel)
 
         self.eta = eta
         self.regularize_beta = regularize_beta
@@ -61,17 +61,16 @@ class kRidgeRegression(BaseKernelEstimator, TransformerMixin, RegressorMixin):
 
             self.Ku = gram_matrix
 
-        oneN = np.ones((n_points, n_points)) / float(n_points)
+        oneN = np.ones(n_points).reshape((-1, 1)) / float(n_points)
 
-        A = oneN.dot(self.Ku)
-        self.K = self.Ku - 2 * A + A.dot(oneN)
+        self.K = self.Ku - oneN.T.dot(self.Ku) - self.Ku.dot(oneN) + oneN.T.dot(self.Ku).dot(oneN)
 
         if self.regularize_beta:
-            mat = self.K.dot(self.K) + self.eta * np.eye(n)
-            self.beta = np.linalg.inv(mat).dot(self.K.dot(y - self.ymean))
+            mat = self.K.dot(self.K) + self.eta * np.eye(n_points)
+            self.beta = np.linalg.inv(mat).dot(self.K.dot(y - self._ymean))
         else:
-            mat = self.K + self.eta * np.eye(n)
-            self.beta = np.linalg.inv(mat).dot(y - self.ymean)
+            mat = self.K + self.eta * np.eye(n_points)
+            self.beta = np.linalg.inv(mat).dot(y - self._ymean)
         
         self.beta = self.beta.reshape((-1, 1))
         return self
@@ -94,15 +93,16 @@ class kRidgeRegression(BaseKernelEstimator, TransformerMixin, RegressorMixin):
         Ku = self.kernel(self._Xtrain, X)
         n_points = len(self._Xtrain)
 
-        oneN = np.ones((n_points, n_points)) / float(n_points)
-        A = self.Ku.dot(oneN)
-        K = Ku - oneN.dot(Ku) - A + oneN.dot(A)
+        oneN = np.ones(n_points).reshape((-1, 1)) / float(n_points)
+
+        K = Ku - self.Ku.dot(oneN) - oneN.T.dot(Ku) + oneN.T.dot(self.Ku).dot(oneN)
 
         # hey whoever's reading this, is this the correct thing if y wasn't
         # mean centered to begin with?
-        y_pred = K.T.dot(self.beta) + self.ymean
+        # pretty sure it's fine
+        y_pred = K.T.dot(self.beta) + self._ymean
 
-        return y_pred
+        return y_pred.flatten()
 
     
     def transform(self, X):

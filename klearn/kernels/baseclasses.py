@@ -11,8 +11,8 @@ class AbstractKernel(object):
         
         Parameters
         ----------
-        X : np.ndarray
-            Numpy array containing points in rows, and features in
+        X : array_like
+            Array containing points in rows, and features in
             the columns. (shape: (n_points, n_features)). If Xtest 
             is None, then the returned gram matrix will consist of
             the inner products between all pairs in this array
@@ -24,6 +24,12 @@ class AbstractKernel(object):
             between points in X (in the rows) to the points in Xtest
             
             .. math: K[i, j] = <X[i], Xtest[j]>
+
+        Notes
+        -----
+        X and Xtest need not be np.ndarray, the only requirement is that
+        they have the __len__ and __getitem__ methods.
+
 
         Returns
         -------
