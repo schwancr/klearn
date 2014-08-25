@@ -12,7 +12,8 @@ class BaseLearner(object):
     def __init__(self, kernel):
         
         if not isinstance(kernel, AbstractKernel):
-            raise Exception("kernel must be of type AbstractKernel")
+            if not hasattr(kernel, 'one_to_all'):
+                raise Exception("kernel must be of type AbstractKernel")
 
         self.kernel = kernel
 

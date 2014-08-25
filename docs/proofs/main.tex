@@ -1,0 +1,94 @@
+\documentclass[aip, jcp, url, amsmath, amssymb,
+ longbibliography, nofootinbib,
+%preprint, 
+reprint,
+]{revtex4-1}
+
+\usepackage{graphicx}% Include figure files
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+\usepackage{hyperref} % make the links clickable
+\usepackage[capitalize]{cleveref}
+\usepackage{soul, color}
+%\usepackage[mathlines]{lineno}% Enable numbering of text and display math
+%\linenumbers\relax % Commence numbering lines
+
+\begin{document}
+
+\title{Documentation for {\tt \bf klearn}, Part I: Derivations}
+\author{C. R. Schwantes}
+
+\begin{abstract}
+Here we derive the kernel versions of several methods in supervised and unsupervised learning. We are by no means claiming to have discovered these methods on our own, but this collection may be useful for those not familiar with the derivations. In addition, most of these methods have alternative derivations and interpretations, the proofs disclosed here are simply my interpretation. \textcolor{red}{\bf These notes are not complete, so there could easily be errors/typos. Let me know if you find one!}
+\end{abstract}
+\maketitle
+\section{Ridge Regression}
+\subsection{Goals}
+
+Suppose we are given $N$ pairs of variables, $\{X_i \in \mathbb{R}^d\}_{i=1}^N$ and $\{y_i \in \mathbb{R}\}_{i=1}^N$. The goal of linear regression is to find a linear function that fits the observed data. We will optimize the parameters of the function to minimize the sum of the squared residuals:
+\begin{equation}
+\label{eq:least_squares}
+\min_{\mathbf{p}, b} \sum_{i=1}^N \Big((\mathbf{p}^T X_i + b) - y_i\Big)^2,
+\end{equation} where $\mathbf{p} \in \mathbb{R}^d$ and $b \in \mathbb{R}$. 
+
+Importantly, we will regularize the solution, $\mathbf{p}$ by adding an $L_2$ penalty to the objective function, weighted by a real number, $\eta$. In addition, we will assume that both the dependent and independent variables have zero mean, and so the y-intercept, $b$ is equal to zero and the full objective function becomes:
+
+\begin{equation}
+\label{eq:ridge}
+\min_{\mathbf{p}} \sum_{i=1}^N \Big(\mathbf{p}^T X_i - y_i\Big)^2 + \eta \mathbf{p}^T \mathbf{p}.
+\end{equation} Let $X$ denote a $d \times N$ matrix with the independent variables in the columns and their features in the rows and $\mathbf{y}$ denote a column vector with the values of the dependent variable in its rows. Then it can be shown that the solution to \cref{eq:ridge} is:
+
+\begin{equation}
+\label{eq:ridge_sol}
+\mathbf{p} = \big(X X^T + \eta I)^{-1} X \mathbf{y}
+\end{equation}
+
+\subsection{Derivation of Kernel Ridge Regression}
+
+Consider an unspecified (possibly non-linear) mapping function, $\Phi : \mathbb{R}^d \to V$ that transforms our vectors into a new space, $V$ termed the feature space. We wish to perform the same regression as above, but in the feature space. Now, the optimization problem can be written as:
+
+\begin{equation}
+\label{eq:kridge}
+\min_{\mathbf{p}} \sum_{i=1}^N \Big(\mathbf{p}^T \Phi(X_i) - y_i\Big)^2 + \eta \mathbf{p}^T\mathbf{p}.
+\end{equation}
+
+We now look to reformulate \cref{eq:ridge} and its solution in terms of a gram matrix of inner products. First, note that \cref{eq:ridge_sol} shows that $\mathbf{p}$ is in the span of the independent variables. Let, $\beta$ be the vector of coefficients such that:
+
+$$ \mathbf{p} = \sum_{i=1}^N \beta_i \Phi(X_i) $$ Now, we need only rewrite \cref{eq:kridge} in terms of the vector $\beta$. It will be useful to define the $N \times N$ gram matrix, $K$ such that:
+$$K_{ij} = \Phi(X_i)^T \Phi(X_j)$$ Notice this matrix is invertible. Now starting with \cref{eq:ridge}:
+\begin{align*}
+\sum_{i=1}^N &\Big(\mathbf{p}^T \Phi(X_i) - y_i\Big)^2 + \eta \mathbf{p}^T\mathbf{p} \\
+	&= \sum_{i=1}^N \left(\sum_{k=1}^N \beta_k \Phi(X_k)^T \Phi(X_i) - y_i\right)^2 \\ 
+	&\;\;\;\;\;\;+ \eta \sum_{k=1}^N \beta_k \Phi(X_k)^T \sum_{l=1}^N \beta_l \Phi(X_l) \\
+	&= \sum_{i=1}^N \left(\sum_{k=1}^N \beta_k K_{ki} - y_i\right)^2 \\ 
+	&\;\;\;\;\;\;+ \eta \sum_{k=1}^N \sum_{l=1}^N \beta_k K_{kl} \beta_l \\
+	&= \left( K \beta - \mathbf{y} \right)^T \left( K \beta - \mathbf{y} \right) + \eta \beta^T K \beta \\
+	&= \beta^T KK \beta - 2 \beta^T K \mathbf{y} + \mathbf{y}^T \mathbf{y} + \eta \beta^T K \beta 
+\end{align*} Taking derivatives with respect to the elements of $\beta$ and setting this equal to zero gives:
+\begin{align*}
+0 &= 2 KK \beta - 2 K \mathbf{y} + 2 \eta K \beta \\
+\beta &= \left(K + \eta I\right)^{-1} \mathbf{y}
+\end{align*} Note, if $K$ is singular, then there are other solutions corresponding to the nonzero vectors in the null space of $K$. 
+
+Interestingly, if we decide to change the regularization and instead penalize the $L_2$ norm of $\beta$ then the optimization problem (in terms of $\beta$) becomes:
+
+\begin{equation}
+\label{eq:kridge_beta}
+\min_\beta \beta^T KK \beta - 2 \beta^T K \mathbf{y} + \mathbf{y}^T \mathbf{y} + \eta \beta^T \beta, 
+\end{equation} and the solution is given by:
+\begin{equation}
+\label{eq:kridge_beta_sol}
+\beta = \left(KK + \eta I\right)^{-1} K\mathbf{y}
+\end{equation} Customarily, the $L_2$ penalty has been applied to the vector $\mathbf{p}$, however, this alternative scheme may be desirable in some contexts. 
+
+\section{Linear Discriminant Analysis / Fisher's Linear Discriminant}
+\subsection{Goals}
+
+LDA is a supervised learning method, where we are given samples of two classes of variables. The goal is to find the projection of the data that maximizes the between class variance, while minimizing the within class variance. 
+
+Let $\{X_{i} \in \mathbb{R}^d\}_{i=1}^{N_X}$ and $\{Y_{i} \in \mathbb{R}^d\}_{i=1}^{N_Y}$ be the two classes of observed data and let $\mu_X$ and $\mu_Y$ be the respective means, while $\overbar{\mu}$ is the global mean. Then, the between class covariance matrix can is given by:
+\begin{equation}
+\label{eq:between_variance}
+
+
+\end{document}

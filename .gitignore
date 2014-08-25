@@ -38,3 +38,6 @@
 build
 dist
 *.egg-info
+
+*Notes.bib
+klearn/version.py

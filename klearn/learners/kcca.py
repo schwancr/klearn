@@ -252,6 +252,10 @@ class kCCA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
         return pred_a
 
 
+    def project(self, X, which):
+        return self.predict(X, which)
+
+
     def evaluate(self, a_pred, a_actual, callback_a=lambda a : a):
         a0 = callback_a(a_actual)
         a1 = callback_a(a_pred)
