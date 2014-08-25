@@ -3,7 +3,7 @@ import numpy as np
 import scipy.linalg
 from mdtraj import io
 from sklearn.base import TransformerMixin
-from klearn.estimators import BaseKernelEstimator
+from klearn.methods import BaseKernelEstimator
 
 class kPCA(BaseKernelEstimator, TransformerMixin):
     """ 

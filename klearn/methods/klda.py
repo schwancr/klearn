@@ -1,8 +1,9 @@
 
 from klearn.methods import BaseKernelEstimator
-from sklearn.base import BaseTransformer, BaseClassifier
+from sklearn.base import TransformerMixin, ClassifierMixin
+import numpy as np
 
-class kLDA(BaseKernelEstimator, BaseTransformer, BaseClassifier):
+class kLDA(BaseKernelEstimator, TransformerMixin, ClassifierMixin):
     r"""
     Perform kernel Linear Discriminant Analysis (which is the same as
     kernel Fisher's Linear Discriminant) for multiple classes

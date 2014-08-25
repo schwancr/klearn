@@ -1,6 +1,7 @@
 
-from klearn.estimators import BaseKernelEstimator
+from klearn.methods import BaseKernelEstimator
 from sklearn.base import TransformerMixin, RegressorMixin
+import numpy as np
 
 class kRidgeRegression(BaseKernelEstimator, TransformerMixin, RegressorMixin):
     r"""

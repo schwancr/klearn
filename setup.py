@@ -20,10 +20,7 @@ metadata = {
     'author_email': 'schwancr@stanford.edu',
     'platforms': ["Linux", "Mac OS X"],
     'zip_safe': False,
-    'description': "Python Code for Learning with Kernels",
-    'long_description': """kernel learning for various datasets,
-    currently only ktICA and kPCA are implemented. To come: kCCA
-    kFDA, etc. and maybe the non-kernelized versions..."""}
+    'description': "Python Code for Learning with Kernels"}
 
 
 def hasfunction(cc, funcname, include=None, extra_postargs=None):
@@ -126,17 +123,16 @@ if os.environ.get('READTHEDOCS', None) == 'True' and __name__ == '__main__':
     import tempfile, shutil
     write_version_py()
     
-    metadata['name'] = 'ktica'
-    metadata['packages'] = ['ktica', 'ktica.objects', 'ktica.kernels', 'ktica.metrics']
+    metadata['name'] = 'klearn'
+    metadata['packages'] = ['klearn.methods', 'klearn.kernels']
     metadata['scripts'] = [e for e in glob('scripts/*.py') if not e.endswith('__.py')]
 
     # dirty, dirty trick to install "mock" packages
     mockdir = tempfile.mkdtemp()
     open(os.path.join(mockdir, '__init__.py'), 'w').close()
-    metadata['package_dir'] = {'ktica': 'ktica',
-                               'ktica.learners' : 'ktica/learners',
-                               'ktica.kernels' : 'ktica/kernels',
-                               'ktica.metrics' : 'ktica/metrics'}
+    metadata['package_dir'] = {'klearn': 'klearn',
+                               'klearn.methods' : 'klearn/methods',
+                               'klearn.kernels' : 'klearn/kernels'}
 
     setup(**metadata)
     shutil.rmtree(mockdir) #clean up dirty trick
@@ -174,10 +170,8 @@ def configuration(parent_package='',top_path=None):
 
     config.add_subpackage('kernels',
                           subpackage_path='klearn/kernels')
-    config.add_subpackage('msmbmetrics',
-                          subpackage_path='klearn/msmbmetrics')
-    config.add_subpackage('learners',
-                          subpackage_path='klearn/learners')
+    config.add_subpackage('methods',
+                          subpackage_path='klearn/methods')
 
     return config
 
