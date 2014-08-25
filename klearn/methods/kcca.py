@@ -3,12 +3,13 @@ import numpy as np
 import scipy.linalg
 from mdtraj import io
 import pickle
-from klearn.learners import BaseLearner, ProjectingMixin, CrossValidatingMixin
+from sklearn.base import TransformerMixin
+from klearn.estimators import BaseKernelEstimator
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class kCCA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
+class kCCA(BaseKernelEstimator, TransformerMixin):
     """ 
     class for calculating tICs in a high dimensional feature space
     """
@@ -16,7 +17,7 @@ class kCCA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
     def __init__(self, kernel, reg_factor=1E-10):
 
         """
-        Initialize an instance of the ktICA solver
+        Initialize an instance of the kCCA solver
 
         Paramaters
         ----------
@@ -28,6 +29,8 @@ class kCCA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             regularization parameter. This class will use a ridge regression
             when solving the generalized eigenvalue problem
         """
+
+        raise Exception("This hasn't been corrected for the sklearn syntax")
 
         super(kCCA, self).__init__(kernel)
 

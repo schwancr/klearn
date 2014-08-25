@@ -32,6 +32,7 @@ class ktICA(BaseLearner, ProjectingMixin, CrossValidatingMixin):
             when solving the generalized eigenvalue problem
         """
 
+        raise Exception("not sklearnified!")
         super(ktICA, self).__init__(kernel)
 
         self._Xa = None

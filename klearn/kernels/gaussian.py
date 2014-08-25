@@ -1,28 +1,29 @@
 
 from .baseclasses import AbstractKernel
-from msmbuilder.metrics.baseclasses import Vectorized
 import numpy as np
 
 class Gaussian(AbstractKernel):
     """
-    gaussian kernel with some standard deviation
+    This kernel is simply the dot product in some vector space given by
+    the metric you pass raised to the power 'd'. 
+
+    Note that only Vectorized metrics will work here.
     """
 
-    def __init__(self, metric, std_dev=1.0):
-
+    def __init__(self, metric='l2', sigma=1.0):
+        
         self.metric = metric
-        self.std_dev = std_dev
-        self.denom = - 2. * std_dev * std_dev
+        self.sigma = sigma
 
-    def __repr__(self):
-        return "Gaussian kernel with norm defined by %s" % str(self.metric)
+    def _kernel_function(self, one, many):
+        """
+        compute the polynomial inner product between one point and many
+        """
 
-    def prepare_trajectory(self, trajectory):
-        return np.double(self.metric.prepare_trajectory(trajectory))
+        n_points, n_features = many.shape
+        one = one.reshape((1, n_features))
 
-    def one_to_all(self, prepared_traj1, prepared_traj2, index1):
+        dists2 = np.square(many - one)
+        result = np.exp(- dists2 / (self.sigma ** 2))
 
-        distances = self.metric.one_to_all(prepared_traj1, prepared_traj2, index1)
-
-        return np.exp(np.square(distances) / self.denom)
-
+        return result
