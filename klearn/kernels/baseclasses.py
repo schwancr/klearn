@@ -1,4 +1,5 @@
 
+import numpy as np
 
 class AbstractKernel(object):
     """Abstract class for all new kernel functions"""

@@ -57,7 +57,7 @@ class ktICA(BaseKernelLearner):
         """
 
         if X_dt is None:
-            self._Xtrain = np.concatenate([X[:- self.dt], X[self.dt:])
+            self._Xtrain = np.concatenate([X[:- self.dt], X[self.dt:]])
         else:
             self._Xtrain = np.concatenate([X, X_dt])
 

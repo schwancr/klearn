@@ -1,6 +1,7 @@
 from klearn.methods import BaseKernelEstimator
 from sklearn.base import TransformerMixin, ClassifierMixin
 import numpy as np
+import scipy
 
 class kLDA(BaseKernelEstimator, TransformerMixin, ClassifierMixin):
     r"""
@@ -20,7 +21,7 @@ class kLDA(BaseKernelEstimator, TransformerMixin, ClassifierMixin):
         regularization strength to apply
     """
     def __init__(self, kernel, eta=1.0):
-        super(self, kLDA).__init__(kernel)
+        super(kLDA, self).__init__(kernel)
 
         self.eta = float(eta)
 
@@ -38,6 +39,8 @@ class kLDA(BaseKernelEstimator, TransformerMixin, ClassifierMixin):
             starting from zero)
         gram_matrix : np.ndarray, optional, shape = [n_samples, n_samples]
         """
+
+        self._Xtrain = X
 
         n_points = len(X)
         if n_points != len(y):
@@ -85,7 +88,7 @@ class kLDA(BaseKernelEstimator, TransformerMixin, ClassifierMixin):
         # regularize
         rhs += np.eye(n_points) * self.eta 
 
-        self.vals, self.betas = np.linalg.eigh(lhs, b=rhs)
+        self.vals, self.betas = scipy.linalg.eigh(lhs, b=rhs)
         inc_ind = np.argsort(self.vals)[::-1]
         self.vals = self.vals[inc_ind]
         self.betas = self.betas[:, inc_ind]        
