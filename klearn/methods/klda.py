@@ -1,4 +1,3 @@
-
 from klearn.methods import BaseKernelEstimator
 from sklearn.base import TransformerMixin, ClassifierMixin
 import numpy as np
@@ -90,6 +89,8 @@ class kLDA(BaseKernelEstimator, TransformerMixin, ClassifierMixin):
         inc_ind = np.argsort(self.vals)[::-1]
         self.vals = self.vals[inc_ind]
         self.betas = self.betas[:, inc_ind]        
+
+        # NEED TO NORMALIZE THE BETAS!!!!!!
 
         self.projected_means = []
         # now compute where the projected means end up
