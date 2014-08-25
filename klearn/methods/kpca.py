@@ -72,6 +72,7 @@ class kPCA(BaseKernelEstimator, TransformerMixin):
 
         return self
 
+
     def transform(self, X):
         """
         Transform new data onto the top `n_components` PC's
