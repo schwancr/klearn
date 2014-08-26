@@ -1,7 +1,7 @@
 
 from sklearn.grid_search import GridSearchCV
 from klearn.methods import kLDA
-from klearn.kernels import Linear
+from klearn.kernels import Linear, RBF
 import numpy as np
 
 def test_klda():
@@ -24,14 +24,18 @@ def test_klda():
     X = np.concatenate([X0, X1])
     y = np.concatenate([np.zeros(n), np.ones(n)])
 
-    linear_kernel = Linear()
+    rbf_kernel = RBF()
 
-    lda_model = kLDA(linear_kernel, eta=1.0)
+    lda_model = kLDA(rbf_kernel, eta=1.0)
 
-    gscv = GridSearchCV(lda_model, [{'eta' : [1E-2, 1E-1, 1, 10, 100]}])  
+    param_set = {'eta': [1E-4, 1E-2, 1, 1E2, 1E4],
+                 'kernel__sigma': [0.01, 0.05, 0.1, 0.25, 0.5]}
+
+    gscv = GridSearchCV(lda_model, param_set)  
     gscv.fit(X, y)
 
     lda_model = gscv.best_estimator_
+    print gscv.best_params_
     
     n_test = 100
     threshold = int(0.02 * 2 * n_test)
