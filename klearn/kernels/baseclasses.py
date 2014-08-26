@@ -1,40 +1,92 @@
-import abc
+
 import numpy as np
-import warnings
 
 class AbstractKernel(object):
     """Abstract class for all new kernel functions"""
-
-    def __call__(self, *args, **kwargs):
-        return self.one_to_all(*args, **kwargs)
-    
-    @abc.abstractmethod
-    def kernel_function(self, distances):
-        return 
-
-    @abc.abstractmethod
-    def prepare_trajectory(self, trajectory):
-        return
-
-    @abc.abstractmethod
-    def one_to_all(self, prepared_traj1, prepared_traj2, index1):
-        return
-
-    @abc.abstractmethod
-    def one_to_many(self, prepared_traj1, prepared_traj2, index1, indices2):
-        return self.one_to_all(prepared_traj1, prepared_traj2[indices2], index1)
-
-    def all_to_all(self, prepared_traj1, prepared_traj2):
+    # the parameters should be exposed to sklearn's grid search
+    # because this class has a get_params method
+    def __call__(self, X, Xtest=None):
+        """
+        Compute a gram matrix from given data.
         
-        return np.vstack([self.one_to_all( prepared_traj1, prepared_traj2, i ) for i in xrange(len(prepared_traj1))])
-            
-    def all_pairwise(self, prepared_traj):
-        traj_length = len(prepared_traj)
-        output = -1 * np.ones(traj_length * (traj_length - 1) / 2)
-        p = 0
-        for i in xrange(traj_length):
-            cmp_indices = np.arange(i, traj_length)
-            output[p: p + len(cmp_indices)] = self.one_to_many(prepared_traj, prepared_traj, i, cmp_indices)
-            p += len(cmp_indices)
+        Parameters
+        ----------
+        X : array_like
+            Array containing points in rows, and features in
+            the columns. (shape: (n_points, n_features)). If Xtest 
+            is None, then the returned gram matrix will consist of
+            the inner products between all pairs in this array
 
-        return output
+            .. math: K[i, j] = <X[i], X[j]>
+
+        Xtest : np.ndarray, optional
+            If not none, then the gram matrix will be the inner product
+            between points in X (in the rows) to the points in Xtest
+            
+            .. math: K[i, j] = <X[i], Xtest[j]>
+
+        Notes
+        -----
+        X and Xtest need not be np.ndarray, the only requirement is that
+        they have the __len__ and __getitem__ methods.
+
+
+        Returns
+        -------
+        K : np.ndarray
+            Gram matrix of inner products. NOTE: This matrix is NOT
+            centered in feature space.
+        """
+
+        if Xtest is None:
+            X2 = X
+        else:
+            X2 = Xtest
+
+        n_rows = len(X)
+        n_cols = len(X2)
+
+        # potential speed-up: since K is symmetric when X2=X, we're
+        # doing twice the work
+        K = np.zeros((n_rows, n_cols))
+        for i in xrange(n_rows):
+            K[i] = self._kernel_function(X[i], X2)
+
+        return K
+
+    def set_params(self, **kwargs):
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
+
+
+    def _kernel_function(self, one, many):
+        raise NotImplementedError()
+        
+
+    def get_params(self):
+        """
+        Get the parameters for the kernel. 
+
+        Returns
+        -------
+        params : dict 
+            parameter names mapped to their values
+
+        Notes
+        -----
+        This behaves just as sklearn.base.BaseEstimator.get_params
+        
+        """
+        out = dict()
+        # Adopted from sklearn's BaseEstimator._get_param_names
+        init = getattr(self.__class__, '__init__')
+        args, varargs, keywards, defaults = inspect.getargspec(init)
+
+        self_ind = np.where(args == 'self')[0][0]
+        args.pop(self_ind)
+
+        for key in args:
+            out[key] = getattr(self, key)
+
+        return out
+        
