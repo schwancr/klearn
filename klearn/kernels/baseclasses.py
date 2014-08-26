@@ -1,5 +1,6 @@
 
 import numpy as np
+import inspect
 
 class AbstractKernel(object):
     """Abstract class for all new kernel functions"""
@@ -63,7 +64,7 @@ class AbstractKernel(object):
         raise NotImplementedError()
         
 
-    def get_params(self):
+    def get_params(self, deep=True):
         """
         Get the parameters for the kernel. 
 
@@ -82,11 +83,16 @@ class AbstractKernel(object):
         init = getattr(self.__class__, '__init__')
         args, varargs, keywards, defaults = inspect.getargspec(init)
 
-        self_ind = np.where(args == 'self')[0][0]
-        args.pop(self_ind)
+        args.pop(0) # remove 'self'
 
         for key in args:
             out[key] = getattr(self, key)
-
+    
+            # do what sklearn expects so that GridSearch works
+            if deep:
+                if hasattr(out[key], 'get_params'):
+                    deep_items = out[key].get_params(deep=True).items()
+                    out.update([(key + '__' + deep_key, deep_val) for deep_key, deep_val in deep_items])
+                    
         return out
         

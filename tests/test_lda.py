@@ -1,5 +1,5 @@
 
-from sklearn.lda import LDA
+from sklearn.grid_search import GridSearchCV
 from klearn.methods import kLDA
 from klearn.kernels import Linear
 import numpy as np
@@ -26,8 +26,12 @@ def test_klda():
 
     linear_kernel = Linear()
 
-    lda_model = kLDA(linear_kernel, eta=eta)
-    lda_model.fit(X, y)
+    lda_model = kLDA(linear_kernel, eta=1.0)
+
+    gscv = GridSearchCV(lda_model, [{'eta' : [1E-2, 1E-1, 1, 10, 100]}])  
+    gscv.fit(X, y)
+
+    lda_model = gscv.best_estimator_
     
     n_test = 100
     threshold = int(0.02 * 2 * n_test)
