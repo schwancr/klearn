@@ -3,10 +3,10 @@ import numpy as np
 import scipy.linalg
 from mdtraj import io
 import pickle
-from klearn.methods import BaseKernelLearner
+from klearn.methods import BaseKernelEstimator
 from sklearn.base import TransformerMixin
 
-class ktICA(BaseKernelLearner):
+class ktICA(BaseKernelEstimator, TransformerMixin):
     """ 
     class for calculating tICs in a high dimensional feature space
     """
@@ -22,6 +22,8 @@ class ktICA(BaseKernelLearner):
             kernel object
         dt : int
             correlation lag time to compute the time-lag correlation matrix
+        n_components : int, optional
+            number of ktICs to use in transforming the data.
         eta : float, optional
             regularization strength
         """
@@ -30,6 +32,7 @@ class ktICA(BaseKernelLearner):
 
         self.eta = float(eta)
         self.dt = int(dt)
+        self.n_components = int(n_components)
 
 
     def fit(self, X, X_dt=None, gram_matrix=None):
@@ -72,9 +75,15 @@ class ktICA(BaseKernelLearner):
 
             self.Ku = gram_matrix
 
-        oneN = np.ones(self.Ku.shape) / float(2 * n_points)
-        A = oneN.dot(self.Ku)
-        self.K = self.Ku - 2 * A + A.dot(oneN)
+
+        self.Ku = (self.Ku + self.Ku.T) * 0.5
+
+        oneN = np.ones(self.Ku.shape[0]) / float(2 * n_points)
+        oneN.reshape((-1, 1))
+
+        self.K = self.Ku - oneN.T.dot(self.Ku) - self.Ku.dot(oneN) + oneN.T.dot(self.Ku.dot(oneN))
+
+        self.K = (self.K + self.K.T) * 0.5
 
         R = np.zeros(self.K.shape)
         R[:n_points, n_points:] = np.eye(n_points)
@@ -85,11 +94,12 @@ class ktICA(BaseKernelLearner):
         lhs = self.K.dot(R).dot(self.K)
         rhs = KK + self.eta * np.eye(2 * n_points)
 
-        self.vals, self.betas = np.linalg.eigh(lhs, b=rhs)
+        self.vals, self.betas = scipy.linalg.eigh(lhs, b=rhs)
+
         dec_ind = np.argsort(self.vals)[::-1]
         
         self.vals = self.vals[dec_ind]
-        self.betas = self.betas[:, :dec_ind]
+        self.betas = self.betas[:, dec_ind]
 
         M = float(self.K.shape[0])
 
@@ -118,23 +128,21 @@ class ktICA(BaseKernelLearner):
         """
 
         Ku = self.kernel(self._Xtrain, X)
-    
-        oneN = np.ones(Ku.shape) / float(Ku.shape[0])
 
-        A = oneN.dot(self.Ku)
+        N = Ku.shape[0]
+        oneN = np.ones((N, 1)) / float(N)
 
-        K = Ku - oneN.dot(Ku) - A + A.dot(oneN)
+        K = Ku - self.Ku.dot(oneN) - oneN.T.dot(Ku) + oneN.T.dot(self.Ku.dot(oneN))
 
         Xnew = K.T.dot(self.betas[:, :self.n_components])
         
         return Xnew
 
 
-    def log_likelihood(self, equil, equil_dt, X=None, X_dt=None, proj_X=None,
-        proj_X_dt=None, num_vecs=10, timestep=1, min_prob=0.0):
+    def score(self, X, X_dt=None, timestep=None):
         """
         Evaluate the solutions based on new data X. This uses the assumption that
-        the ktICA solutions are the eigenfunctions of the Transfer operator.
+        the ktICA solutions are the eigenfunctions of a Transfer operator.
         This means we can decompose the transfer operator into a sum of terms
         along each ktICA solution, which gives a probability of a new trajectory.
 
@@ -143,22 +151,12 @@ class ktICA(BaseKernelLearner):
 
         Parameters
         ----------
-        equil : np.ndarray
-            equilibrium probability of each conformation in the data, X
-        equil_dt : np.ndarray
-            equilibrium probability of each conformation in the data, X_dt
         X : np.ndarray
             data with features in the second axis
         X_dt : np.ndarray
             data such that X_dt[i] is observed one timestep after X[i]. Note
             that this timestep need not be the same as the dt specified for
             solving the ktICA solution
-        proj_X : np.ndarray
-            same as X, but already projected using self.project(X, ...)
-        proj_X_dt : np.ndarray
-            same as X_dt, but already projected using self.project(X_dt, ...)
-        num_vecs : int, optional
-            number of vectors to evaluate the likelihood at
         timestep : time separating X from X_dt (should be in the same units
             as self.dt
 
@@ -168,22 +166,11 @@ class ktICA(BaseKernelLearner):
             log likelihood of the new data given the ktICA solutions
         """
 
-        if len(equil.shape) == 1:
-            equil = np.reshape(equil, (-1, 1))
-        
+        if self.betas is None:
+            return - np.inf
 
-        if len(equil_dt.shape) == 1:
-            equil_dt = np.reshape(equil_dt, (-1, 1))
-        
-
-        if proj_X is None or proj_X_dt is None:
-            proj_X = self.project(X, which=np.arange(num_vecs))
-            proj_X_dt = self.project(X_dt, which=np.arange(num_vecs))
-
-
-        if np.unique([len(ary) for ary in [proj_X, proj_X_dt, equil, equil_dt]]).shape[0] != 1:
-            raise Exception("X, X_dt, equil, and equil_dt should all be the same length.")
-
+        if timestep is None:
+            timestep = self.dt
 
         if timestep < self.dt:
             raise Exception("can't model dynamics less than original dt.")
@@ -197,17 +184,23 @@ class ktICA(BaseKernelLearner):
 
             exponent = int(round(timestep / self.dt))
 
-        N = proj_X.shape[0]
+        if X_dt is None:
+            X_dt = X[timestep:]
+            X = X[:-timestep]
 
+        proj_X = self.transform(X)
+        proj_X_dt = self.transform(X_dt)
+        
+        N = proj_X.shape[0]
         # the first right eigenvector sends everything to unity
         proj_X = np.hstack([np.ones((N, 1)), proj_X])
         proj_X_dt = np.hstack([np.ones((N, 1)), proj_X_dt])
 
-        vals = np.concatenate([[1], self.vals[:num_vecs]]).real
+        vals = np.concatenate([[1], self.vals[:self.n_components]]).real
         vals = np.power(vals, exponent)
         vals = np.reshape(vals, (-1, 1))
 
-        temp_array = proj_X * proj_X_dt * equil_dt
+        temp_array = proj_X * proj_X_dt
         # don't multiply by muA because that is the normalization
         # constraint on the output PDF
         temp_array = temp_array.dot(vals)
@@ -217,12 +210,10 @@ class ktICA(BaseKernelLearner):
         #temp_array[np.where(temp_array <=0)] = temp_array[np.where(temp_array > 0)].min() / 1E6
         bad_ind = np.where(temp_array <= 0)[0]
         if len(bad_ind) > 0:
-            logger.warn("%d (out of %d) pairs were assigned nonpositive probabilities" % (len(bad_ind), len(temp_array)))
+            log_like = - np.inf
 
-        if min_prob > 0:
-            temp_array[bad_ind] = min_prob
-
-        log_like = np.log(temp_array).sum()
+        else:
+            log_like = np.log(temp_array).sum()
 
         return log_like
 
