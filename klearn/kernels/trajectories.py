@@ -1,5 +1,6 @@
 
 from klearn.kernels import AbstractKernel
+import numpy as np
 
 class TrajectoryKernel(AbstractKernel):
     def __init__(self, kernel):
