@@ -1,4 +1,5 @@
 
+import pickle
 from sklearn.grid_search import GridSearchCV
 from klearn.methods import ktICA
 from klearn.kernels import Linear, RBF
@@ -56,8 +57,11 @@ def test_ktica():
     print gscv.best_params_
     print - dt / np.log(lam_ref), - dt / np.log(lam_est)
     
-    plot(x, y, lw=3)
-    show()
+    #plot(x, y, lw=3)
+    #show()
+
+    with open('out.pickle', 'wb') as fh:
+        pickle.dump(gscv, fh)
 
 if __name__ == '__main__':
     test_ktica()

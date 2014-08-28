@@ -1,11 +1,14 @@
-
 import numpy as np
 import inspect
+from sklearn.base import BaseEstimator
 
-class AbstractKernel(object):
+# inherit from BaseEstimator so that we can use the [sg]et_params methods
+# this isn't really the best way to do it, because the kernel simply
+# isn't an estimator... but this is useful. I could alternatively
+# just write the [sg]et_params methods correctly but that seems a bit
+# silly if I can just reuse sklearn's stuff 
+class AbstractKernel(BaseEstimator):
     """Abstract class for all new kernel functions"""
-    # the parameters should be exposed to sklearn's grid search
-    # because this class has a get_params method
     def __call__(self, X, Xtest=None):
         """
         Compute a gram matrix from given data.
@@ -55,44 +58,45 @@ class AbstractKernel(object):
 
         return K
 
-    def set_params(self, **kwargs):
-        for key, value in kwargs.iteritems():
-            setattr(self, key, value)
-
 
     def _kernel_function(self, one, many):
         raise NotImplementedError()
-        
 
-    def get_params(self, deep=True):
-        """
-        Get the parameters for the kernel. 
 
-        Returns
-        -------
-        params : dict 
-            parameter names mapped to their values
-
-        Notes
-        -----
-        This behaves just as sklearn.base.BaseEstimator.get_params
-        
-        """
-        out = dict()
-        # Adopted from sklearn's BaseEstimator._get_param_names
-        init = getattr(self.__class__, '__init__')
-        args, varargs, keywards, defaults = inspect.getargspec(init)
-
-        args.pop(0) # remove 'self'
-
-        for key in args:
-            out[key] = getattr(self, key)
-    
-            # do what sklearn expects so that GridSearch works
-            if deep:
-                if hasattr(out[key], 'get_params'):
-                    deep_items = out[key].get_params(deep=True).items()
-                    out.update([(key + '__' + deep_key, deep_val) for deep_key, deep_val in deep_items])
-                    
-        return out
-        
+    #def set_params(self, **kwargs):
+    #    for key, value in kwargs.iteritems():
+    #        if 
+    #        setattr(self, key, value)
+    #   
+    #
+    #def get_params(self, deep=True):
+    #    """
+    #    Get the parameters for the kernel. 
+    #
+    #    Returns
+    #    -------
+    #    params : dict 
+    #        parameter names mapped to their values
+    #
+    #    Notes
+    #    -----
+    #    This behaves just as sklearn.base.BaseEstimator.get_params
+    #    
+    #    """
+    #    out = dict()
+    #    # Adopted from sklearn's BaseEstimator._get_param_names
+    #    init = getattr(self.__class__, '__init__')
+    #    args, varargs, keywards, defaults = inspect.getargspec(init)
+    #
+    #    args.pop(0) # remove 'self'
+    #
+    #    for key in args:
+    #        out[key] = getattr(self, key)
+    #
+    #        # do what sklearn expects so that GridSearch works
+    #        if deep:
+    #            if hasattr(out[key], 'get_params'):
+    #                deep_items = out[key].get_params(deep=True).items()
+    #                out.update([(key + '__' + deep_key, deep_val) for deep_key, deep_val in deep_items])
+    #                
+    #    return out
