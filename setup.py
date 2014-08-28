@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from distutils.ccompiler import new_compiler
 
-VERSION = "0.1"
+VERSION = "0.2"
 ISRELEASED = False
 __author__ = "Christian Schwantes"
 __version__ = VERSION
