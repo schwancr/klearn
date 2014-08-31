@@ -10,9 +10,11 @@ class Polynomial(AbstractKernel):
     Note that only Vectorized metrics will work here.
     """
 
-    def __init__(self, degree=2):
+    def __init__(self, c=1.0, degree=2):
         
-        self.power = power
+        self.degree = float(degree)
+        self.c = float(c)
+        
 
     def _kernel_function(self, one, many):
         """
@@ -23,6 +25,6 @@ class Polynomial(AbstractKernel):
         one = one.reshape((n_features, 1))
 
         dots = many.dot(one)
-        result = np.power(dots, self.degree)
+        result = np.power(dots + self.c, self.degree).flatten()
 
         return result
